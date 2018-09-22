@@ -100,6 +100,73 @@ class TestAttachCommand(unittest.TestCase):
         ui.notify.assert_called()
 
 
+class TestDSNCommands(unittest.TestCase):
+    """Tests for the DNSCommand"""
+
+    mail_addr = 'foo@example.com'
+    alt_mail = 'bar@example.com'
+
+    @staticmethod
+    def _make_ui_mock():
+        """Create a mock for the ui and envelope and return them."""
+        envelope = Envelope()
+        envelope['From'] = 'foo <foo@example.com>'
+        ui = utilities.make_ui(current_buffer=mock.Mock(envelope=envelope))
+        return envelope, ui
+
+    @utilities.async_test
+    async def test_receipt_read_addr_from_account(self):
+        env, ui = self._make_ui_mock()
+        # The actual keyid doesn't matter, since it'll be mocked anyway
+        cmd = envelope.DSNCommand(action='read')
+        with mock.patch(
+                'alot.commands.envelope.settings.get_account_by_address',
+                mock.Mock(return_value=mock.Mock(address=self.mail_addr))):
+            await cmd.apply(ui)
+
+        expected = deepcopy(env.headers)
+        expected['Disposition-Notification-To'] = [self.mail_addr]
+        self.assertDictEqual(env.headers, expected)
+
+    @utilities.async_test
+    async def test_receipt_delivered_addr_from_account(self):
+        env, ui = self._make_ui_mock()
+        # The actual keyid doesn't matter, since it'll be mocked anyway
+        cmd = envelope.DSNCommand(action='delivered')
+        with mock.patch(
+                'alot.commands.envelope.settings.get_account_by_address',
+                mock.Mock(return_value=mock.Mock(address=self.mail_addr))):
+            await cmd.apply(ui)
+
+        expected = deepcopy(env.headers)
+        expected['Return-Receipt-To'] = [self.mail_addr]
+        self.assertDictEqual(env.headers, expected)
+
+    @utilities.async_test
+    async def test_receipt_read_addr_argument(self):
+        env, ui = self._make_ui_mock()
+
+        # The actual keyid doesn't matter, since it'll be mocked anyway
+        cmd = envelope.DSNCommand(action='read', address=self.alt_mail)
+        await cmd.apply(ui)
+
+        expected = deepcopy(env.headers)
+        expected['Disposition-Notification-To'] = [self.alt_mail]
+        self.assertDictEqual(env.headers, expected)
+
+    @utilities.async_test
+    async def test_receipt_delivered_addr_argument(self):
+        env, ui = self._make_ui_mock()
+
+        # The actual keyid doesn't matter, since it'll be mocked anyway
+        cmd = envelope.DSNCommand(action='delivered', address=self.alt_mail)
+        await cmd.apply(ui)
+
+        expected = deepcopy(env.headers)
+        expected['Return-Receipt-To'] = [self.alt_mail]
+        self.assertDictEqual(env.headers, expected)
+
+
 class TestHeaderCommands(unittest.TestCase):
     """Tests for the SetCommand for headers"""
     base_headers = {"From": ["foo <foo@example.com>"],
