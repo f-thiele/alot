@@ -412,8 +412,8 @@ class SetCommand(Command):
         :type action: str
         :param key: key of the header to change
         :type key: str
-        :param value: new value
-        :type value: str
+        :param value: new values
+        :type value: list(str)
         """
         self.action = action
         self.key = key
