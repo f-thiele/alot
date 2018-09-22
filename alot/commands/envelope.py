@@ -458,6 +458,61 @@ class SetCommand(Command):
         ui.current_buffer.rebuild()
 
 
+@registerCommand(MODE, 'receipt-read', forced={'action': 'read'}, arguments=[
+    (['address'], {'nargs': '?',
+                   'help': 'address for receiving DSN'})],
+    help='request read receipt')
+@registerCommand(MODE, 'receipt-delivered', forced={'action': 'delivered'},
+                 arguments=[
+    (['address'], {'nargs': '?',
+                   'help': 'address for receiving DSN'})],
+    help='request delivery receipt')
+class DSNCommand(Command):
+    """toggle DSN status request"""
+    repeatable = True
+
+    def __init__(self, action, address=None, **kwargs):
+        """
+        :param action: whether to request read or delivered message
+        :type action: str
+        :param address: address for receiving DSN
+        :type address: str
+        """
+        self.action = action
+        self.address = address
+
+        Command.__init__(self, **kwargs)
+
+    async def apply(self, ui):
+        envelope = ui.current_buffer.envelope
+
+        if self.action == 'read':
+            key = 'Disposition-Notification-To'
+        elif self.action == 'delivered':
+            key = 'Return-Receipt-To'
+        else:
+            raise CommandParseError
+
+        # if address has not been explicitly set by user we will use the
+        # one that matches the account for the current `From` header field
+        if self.address is None:
+            try:
+                acc = settings.get_account_by_address(envelope['From'])
+            except NoMatchingAccount:
+                ui.notify(('Unable to find a matching account. Please specify'
+                           'a DSN address explicitly.'),
+                          priority='error')
+                return
+            self.address = [str(acc.address)]
+        else:
+            self.address = [self.address]
+
+        cmd = SetCommand(action='toggleset', key=key, value=self.address)
+        await cmd.apply(ui)
+
+        ui.current_buffer.rebuild()
+
+
 @registerCommand(MODE, 'toggleheaders')
 class ToggleHeaderCommand(Command):
     """toggle display of all headers"""
